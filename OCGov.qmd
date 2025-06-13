@@ -871,7 +871,7 @@ FigModem1Pre <- ggplot(Snapshot1 |> dplyr::filter(
   theme(
     plot.title = element_text(hjust = 0.5, face = "bold"),
     axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "bottom"
+    legend.position = "right"
   )
 
 
@@ -908,7 +908,7 @@ FigModem1PreB <- ggplot(Snapshot1 |> dplyr::filter(
   theme(
     plot.title = element_text(hjust = 0.5, face = "bold"),
     axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "bottom"
+    legend.position = "right"
   )
 
 
@@ -920,9 +920,8 @@ knitr::knit_print(FigModem1PreB)
 #| label: fig-modemp3
 #| fig-cap: "Satisfaction with sleep comfort by Time Point and Cohort captured by post-operative MODEMs"
 
-FigModemP3 <- ggplot(PROMMODEM1 |> dplyr::filter(!is.na(MODEMPQ3), SurgicalTreatment2 == "Surgical"), aes(x = TimePoint, fill = MODEMPQ3)) +
+FigModemP3 <- ggplot(PROMMODEM1 |> dplyr::filter(!is.na(MODEMPQ3), SurgicalTreatment == "Surgical"), aes(x = TimePoint, fill = MODEMPQ3)) +
   geom_bar(position = "fill") +
-  facet_wrap(~ RegistryCohortName) +
   labs(#title = "Satisfaction with sleep comfort by Time Point and Cohort",
        x = "Time Point",
        y = "Count",
@@ -931,58 +930,57 @@ FigModemP3 <- ggplot(PROMMODEM1 |> dplyr::filter(!is.na(MODEMPQ3), SurgicalTreat
   theme_minimal() +
   theme(
     plot.title = element_text(hjust = 0.5, face = "bold"),
-    legend.position = "bottom"
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "right"
   )
 
 knitr::knit_print(FigModemP3)
 ```
 
-## Rotator Cuff
+## Knee Arthritis
 
 ```{r}
 #| label: tbl-rc-demographics
-#| tbl-cap: "Summary of demographics in Rotator Cuff cohort"
+#| tbl-cap: "Summary of demographics in Knee Arthritis cohort"
 
-TableRCdemo <- gtsummary::tbl_summary(
+TableKAdemo <- gtsummary::tbl_summary(
   Snapshot |> dplyr::filter(
-    RegistryCohortName == "RotatorCuff"
+    str_detect(RegistryCohortName,"KneeArthritis")
   ) |> dplyr::select(
     TreatmentType,
-    SurgicalTreatment2,
+    SurgicalTreatment,
     TreatmentStatus,
     DateInitialExamination,
     AgeAtInitialExam,
-    Sex,
-    EducationLevel_Preop,
-    DiagnosisPrimary
+    Sex
   ),
-  by = "SurgicalTreatment2",
+  by = "SurgicalTreatment",
   missing = "no",
   statistic = list(
     DateInitialExamination ~ "{min} - {max}"
   )
 )
 
-knitr::knit_print(TableRCdemo)
+knitr::knit_print(TableKAdemo)
 ```
 
 ```{r}
-#| label: tbl-rc-intraop
-#| tbl-cap: "Summary of intraoperative variables in Rotator Cuff cohort"
+#| label: tbl-ka-intraop
+#| tbl-cap: "Summary of intraoperative variables in Knee Arthritis cohort"
 
-TableRCsurg <- gtsummary::tbl_summary(
+TableKAsurg <- gtsummary::tbl_summary(
   Snapshot |> dplyr::filter(
-    RegistryCohortName == "RotatorCuff",
-    SurgicalTreatment2 == "Surgical"
+    str_detect(RegistryCohortName,"KneeArthritis"),
+    SurgicalTreatment == "Surgical"
   ) |> dplyr::select(
-    CuffStatus:CuffRepair
-  ) |> mutate(
-    across(contains("TearSize"), ~as.numeric(.))
+    Surgeon,
+    ArthroplastyTreatmentKnee:BearingTypeKnee
   ),
+  by = "Surgeon",
   missing = "no"
 )
 
-knitr::knit_print(TableRCsurg)
+knitr::knit_print(TableKAsurg)
 
 
 ```
@@ -1088,35 +1086,34 @@ FigureWORCQ3_overlay <- PROMRC |> dplyr::filter(
 knitr::knit_print(FigureWORCQ3_overlay)
 ```
 
-Assessment of the *Rotator Cuff* cohort reveals that some patients enrolled in the cohort are scoring high on the KOOS JR preoperatively, intraoperative data requires backfilling and that there may be sufficient variation in surgical technique to warrant further investigation (e.g. patellar resurfacing, tourniquet use, soft tissue management).
+Assessment of the *Knee Arthritis* cohort reveals that some patients enrolled in the cohort are scoring high on the KOOS JR preoperatively, intraoperative data requires backfilling and that there may be sufficient variation in surgical technique to warrant further investigation (e.g. patellar resurfacing, tourniquet use, soft tissue management).
 
-## Glenohumeral Instability
+## Hip Arthritis
 
 ```{r}
 #| label: tbl-ghi-demographics
-#| tbl-cap: "Summary of demographics in Tibiofemoral Instability cohort"
+#| tbl-cap: "Summary of demographics in Hip Arthritis cohort"
 
-TableGHIdemo <- gtsummary::tbl_summary(
+TableHAdemo <- gtsummary::tbl_summary(
   Snapshot |> dplyr::filter(
-    RegistryCohortName == "GlenohumeralInstability"
+    str_detect(RegistryCohortName, "HipArthritis")
   ) |> dplyr::select(
     TreatmentType,
-    SurgicalTreatment2,
+    SurgicalTreatment,
     TreatmentStatus,
     DateInitialExamination,
     AgeAtInitialExam,
     Sex,
-    EducationLevel_Preop,
-    DiagnosisPrimary
+    ComorbScore_Preop
   ),
-  by = "SurgicalTreatment2",
+  by = "SurgicalTreatment",
   missing = "no",
   statistic = list(
     DateInitialExamination ~ "{min} - {max}"
   )
 )
 
-knitr::knit_print(TableGHIdemo)
+knitr::knit_print(TableHAdemo)
 ```
 
 ```{r}
