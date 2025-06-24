@@ -9,7 +9,7 @@ number-depth: 3
 date: "2025-Jun-13"
 date-modified: "2025-Jun-13"
 
-bibliography: OCGov references.bib
+
 
 editor:
   visual
@@ -879,7 +879,7 @@ knitr::knit_print(FigModem1Pre)
 ```
 
 ```{r}
-#| label: fig-modempre1B
+#| label: fig-modempre1C
 #| fig-cap: "Expectations of symptom relief by Cohort and Treatment TYpe captured by pre-treatment MODEMs for non-surgical cases"
 
 Snapshot1 <- Snapshot |> dplyr::mutate(
@@ -917,15 +917,30 @@ knitr::knit_print(FigModem1PreB)
 ```
 
 ```{r}
-#| label: fig-modemp3
-#| fig-cap: "Satisfaction with sleep comfort by Time Point and Cohort captured by post-operative MODEMs"
+#| label: fig-modempre1B
+#| fig-cap: "Expectations of sleep discomfort relief by Cohort and Treatment TYpe captured by pre-treatment MODEMs for surgical cases"
 
-FigModemP3 <- ggplot(PROMMODEM1 |> dplyr::filter(!is.na(MODEMPQ3), SurgicalTreatment == "Surgical"), aes(x = TimePoint, fill = MODEMPQ3)) +
+Snapshot1 <- Snapshot1 |> dplyr::mutate(
+  MODEMQ3_Preop = forcats::fct(
+    MODEMQ3_Preop,
+    levels = c(
+    "Not applicable",
+    "Not at all likely",
+    "Slightly likely",
+    "Somewhat likely",
+    "Very likely",
+    "Extremely likely"
+  ))
+)
+
+FigModem3PreB <- ggplot(Snapshot1 |> dplyr::filter(
+  !is.na(MODEMQ3_Preop),
+  SurgicalTreatment == "Surgical"
+  ),
+  aes(x = RegistryCohortName,
+      fill = MODEMQ3_Preop)
+  ) + 
   geom_bar(position = "fill") +
-  labs(#title = "Satisfaction with sleep comfort by Time Point and Cohort",
-       x = "Time Point",
-       y = "Count",
-       fill = "Outcome") +
   scale_fill_viridis_d(option = "viridis") +
   theme_minimal() +
   theme(
@@ -934,13 +949,15 @@ FigModemP3 <- ggplot(PROMMODEM1 |> dplyr::filter(!is.na(MODEMPQ3), SurgicalTreat
     legend.position = "right"
   )
 
-knitr::knit_print(FigModemP3)
+
+knitr::knit_print(FigModem3PreB)
+
 ```
 
 ## Knee Arthritis
 
 ```{r}
-#| label: tbl-rc-demographics
+#| label: tbl-ka-demographics
 #| tbl-cap: "Summary of demographics in Knee Arthritis cohort"
 
 TableKAdemo <- gtsummary::tbl_summary(
@@ -963,21 +980,136 @@ TableKAdemo <- gtsummary::tbl_summary(
 
 knitr::knit_print(TableKAdemo)
 ```
+Prepare intraop variables for display
+
+```{r}
+SnapshotKA2 <- SnapshotKA |> dplyr::filter(
+   str_detect(RegistryCohortName,"KneeArthritisSurgical"),
+   !is.na(DateTreatment)
+) |> dplyr::select(
+  where(~!all(is.na(.)))
+  ) |> dplyr::select(
+    TreatmentID,
+    Surgeon,
+    DVTProphylaxisProvided:InvolvedJoint,
+    ArthroplastyTreatmentKnee:BearingTypeKnee,
+    -(contains("FemoralAugment"))
+  ) |> mutate(
+    MissIntraOp = if_else(
+      if_all(DVTProphylaxisProvided:BearingTypeKnee, is.na),
+      "Missing",
+      "Attempted"
+    ),
+    TourniquetDuration = as.numeric(TourniquetDuration),
+    LARopivacaine = if_else(
+      stringr::str_detect(str_to_lower(LocalInfiltrationComposition),"ropivicain|ropivacain"),
+      TRUE,
+      FALSE
+    ),
+    LANaropin = if_else(
+      stringr::str_detect(str_to_lower(LocalInfiltrationComposition),"naropin"),
+      TRUE,
+      FALSE
+    ),
+    LATXA = if_else(
+      stringr::str_detect(str_to_lower(LocalInfiltrationComposition),"tranexamic"),
+      TRUE,
+      FALSE
+    ),
+    FemurImplantKneeManufacturer2 = case_when(
+      stringr::str_detect(str_to_lower(FemurImplantKneeManufacturer),"depuy") ~ "Depuy",
+      stringr::str_detect(str_to_lower(FemurImplantKneeManufacturer),"yker|mako") ~ "Stryker"
+    ),
+    TibiaImplantKneeManufacturer2 = case_when(
+      stringr::str_detect(str_to_lower(TibiaImplantKneeManufacturer),"depuy") ~ "Depuy",
+      stringr::str_detect(str_to_lower(TibiaImplantKneeManufacturer),"yker|mako") ~ "Stryker"
+    ),
+    # Extract the base number from the component size
+    size_numeric1 = as.numeric(str_extract(ComponentSizeFemoral, "\\d+")),
+    size_numeric2 = as.numeric(str_extract(ComponentSizeTibial, "\\d+")),
+     size_numeric3 = as.numeric(str_extract(ComponentSizeInsert, "\\d+")),
+    # Create ordinal factor based on the extracted numbers
+    ComponentSizeFemoral_ordinal = factor(
+      size_numeric1,
+      levels = sort(unique(size_numeric1), na.last = TRUE),
+      ordered = TRUE
+    ),
+    ComponentSizeTibial_ordinal = factor(
+      size_numeric2,
+      levels = sort(unique(size_numeric2), na.last = TRUE),
+      ordered = TRUE
+    ),
+     ComponentSizeInsert_ordinal = factor(
+      size_numeric3,
+      levels = sort(unique(size_numeric3), na.last = TRUE),
+      ordered = TRUE
+    )
+  )
+```
+
+
+
 
 ```{r}
 #| label: tbl-ka-intraop
 #| tbl-cap: "Summary of intraoperative variables in Knee Arthritis cohort"
 
 TableKAsurg <- gtsummary::tbl_summary(
-  Snapshot |> dplyr::filter(
-    str_detect(RegistryCohortName,"KneeArthritis"),
-    SurgicalTreatment == "Surgical"
-  ) |> dplyr::select(
+  SnapshotKA2 |> dplyr::select(
     Surgeon,
-    ArthroplastyTreatmentKnee:BearingTypeKnee
+    MissIntraOp,
+    ArthroplastyTreatmentKnee,
+    ArthroplastyTypeKnee,
+    DVTProphylaxisProvided,
+    AnalgesiaProvided,
+AbxProphylaxisProvided,
+DVTProphylaxisStandardProtocol,
+AnalgesiaStandardProtocol,
+AbxProphylaxisStandardProtocol,
+DVTProphylaxisNonStandardProtocolDetails,
+DVTProphylaxisNonStandardProtocolDosage,
+DVTProphylaxisNonStandardProtocolDuration,
+TourniquetUse,
+TourniquetDuration,
+Anaesthetic,
+LARopivacaine,
+LANaropin,
+LATXA,
+TranexamicAcid,
+ApproachMedialParapatellar,
+SoftTissueReleaseMedialKnee,
+SoftTissueReleaseLateralKnee,
+SoftTissueReleasePosteriorKnee,
+SoftTissueReleaseAnteriorKnee,
+ArthroplastyProcedureMedialTibiofemoral,
+
+FemurImplantKneeManufacturer2,
+TibiaImplantKneeManufacturer2,
+ComponentSizeFemoral_ordinal,
+ComponentSizeTibial_ordinal,
+ComponentSizeInsert_ordinal,
+ProsthesisConstraint,
+BearingTypeKnee
   ),
   by = "Surgeon",
-  missing = "no"
+  missing = "no",
+  type = list(
+      c(
+        ArthroplastyTreatmentKnee,
+      AnalgesiaProvided,
+      AbxProphylaxisProvided,
+      AnalgesiaStandardProtocol,
+      ArthroplastyProcedureMedialTibiofemoral) ~ "dichotomous"
+  ),
+  value = list(
+    c(
+      ArthroplastyTreatmentKnee,
+      AnalgesiaProvided,
+      AbxProphylaxisProvided,
+      AnalgesiaStandardProtocol) ~ "Yes",
+    ArthroplastyProcedureMedialTibiofemoral ~ "Prosthesis Insertion"
+  ),
+
 )
 
 knitr::knit_print(TableKAsurg)
@@ -985,20 +1117,259 @@ knitr::knit_print(TableKAsurg)
 
 ```
 
+
+
+
+
 ```{r}
-#| label: fig-worc-rc
-#| fig-cap: "Summary of WORC normalised by Timepoint"
+#| label: tbl-ka-prae
+#| tbl-cap: "Summary of patient-reported adverse events in Knee Arthritis cohort"
 
-preop_position <- which(levels(PROMRC$TimePoint) == "Preop")
-
-
-PROMKA2 <- dplyr::mutate(
-  PROMRC,
-  across(contains("Norm"), ~as.numeric(.))
+TableKAPRAE <- gtsummary::tbl_summary(
+  SnapshotKA |> dplyr::select(
+    PRAEventsQ1_6weeks:PRAEventsFlag_6weeks,
+    -PRAEventsQ6_6weeks,
+    -PRAEventsQ8_6weeks
+  ),
+  missing = "no",
+  label = list(
+    PRAEventsQ1_6weeks = "Subsequent Surgery",
+    PRAEventsQ2_6weeks = "ED Visit",
+    PRAEventsQ3_6weeks = "Non-Surgeon Healthcare",
+    PRAEventsQ4_6weeks = "Unplanned Surgeon Followup",
+    PRAEventsQ5_6weeks = "Change in Overall Health",
+    PRAEventsQ7_6weeks = "Nature of Visit",
+    PRAEventsQ9Pain_6weeks = "Pain",
+    PRAEventsQ9Stiffness_6weeks = "Stiffness",
+    PRAEventsQ9Instability_6weeks = "Instability",              
+    PRAEventsQ9LossOfLength_6weeks = "Loss of Alignment | Shape",
+    PRAEventsQ9LossOfFeeling_6weeks = "Loss of Feeling",
+    PRAEventsQ9Weakness_6weeks = "Loss of Control | Weakness",
+    PRAEventsQ9Irritation_6weeks = "Hardware Irritation",
+    PRAEventsQ10_6weeks = "Wound issues",
+    PRAEventsFlag_6weeks = "Event Flag" 
+    # if any Q1-Q4 says Yes, 
+    # Q9 pain/stiffness >= 50 OR 
+    # Q9 length >= 20 OR Q9 feeling/weakness/irritation >= 10
+    # Q10 has redness/heat/swelling/separation/discharge/bleeding or other
+    
+    ),
 )
-FigureWORC_overlay <- PROMKA2 |> dplyr::filter(
-  !(is.na(SurgicalTreatment2))
-) |> ggplot(aes(y = WORCNorm, x = TimePoint, fill = SurgicalTreatment2, color = SurgicalTreatment2)) +
+
+knitr::knit_print(TableKAPRAE)
+```
+
+
+```{r}
+#| label: fig-koos12-ka
+#| fig-cap: "Summary of KOOS12 by Timepoint"
+
+preop_position <- which(levels(PROMKA$TimePoint) == "Preop")
+
+
+FigureKOOS12 <- PROMKA |> ggplot(aes(y = KOOS12Score, x = TimePoint)) +
+  stat_halfeye(
+    alpha = 0.5,  # Transparency for overlap visibility
+    position = "identity",  # Overlay the distributions
+    na.rm = TRUE,
+    scale = 0.9  # Slightly scale down to avoid too much overlap
+  ) +
+  # Add the ellipse annotation
+  ggforce::geom_ellipse(aes(x0 = preop_position, 
+                  y0 = 70, 
+                  a = 0.3, 
+                  b = 5, 
+                  angle = 0),
+             color = "red", 
+             linewidth = 1.2,
+             inherit.aes = FALSE) +
+  annotate("text", 
+           x = preop_position + 0.4, 
+           y = 85,
+           label = "High preop scores",
+           color = "red",
+           fontface = "bold",
+           linewidth = 3.5) +
+  # Add appropriate scale colors
+  scale_fill_manual(values = c("Surgical" = "steelblue", "Non-Surgical" = "darkgray", "Surgery recommended" = "darkred")) +
+  scale_color_manual(values = c("Surgical" = "steelblue4", "Non-Surgical" = "dimgray", "Surgery recommended" = "darkred")) +
+  labs(
+    y = "KOOS12 Total Score",
+    x = "Time Point"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid.minor = element_blank()
+  )
+
+knitr::knit_print(FigureKOOS12)
+```
+
+
+
+## Hip Arthritis
+
+```{r}
+#| label: tbl-ha-demographics
+#| tbl-cap: "Summary of demographics in Hip Arthritis cohort"
+
+TableHAdemo <- gtsummary::tbl_summary(
+  Snapshot |> dplyr::filter(
+    str_detect(RegistryCohortName, "HipArthritis")
+  ) |> dplyr::select(
+    TreatmentType,
+    SurgicalTreatment,
+    TreatmentStatus,
+    DateInitialExamination,
+    AgeAtInitialExam,
+    Sex,
+    ComorbScore_Preop
+  ) |> dplyr::mutate(
+    Sex = case_when(
+      stringr::str_detect(Sex, "F") ~ "Female",
+      stringr::str_starts(Sex, "M") ~ "Male"
+    )
+  ),
+  by = "SurgicalTreatment",
+  missing = "no",
+  statistic = list(
+    DateInitialExamination ~ "{min} - {max}"
+  )
+)
+
+knitr::knit_print(TableHAdemo)
+```
+
+Prepare intraop variables for display
+
+```{r}
+SnapshotHA2 <- SnapshotHA |> dplyr::filter(
+   str_detect(RegistryCohortName,"HipArthritisSurgical"),
+   !is.na(DateTreatment)
+) |> dplyr::select(
+  where(~!all(is.na(.)))
+  ) |> dplyr::select(
+    TreatmentID,
+    Surgeon,
+    DVTProphylaxisProvided:InvolvedJoint,
+    OAGradeHip,
+    ArthroplastyTreatmentHip:BearingTypeHip,
+    -(contains("Temporary"))
+  ) |> mutate(
+    MissIntraOp = if_else(
+      if_all(ArthroplastyTreatmentHip:BearingTypeHip, is.na),
+      "Missing",
+      "Attempted"
+    ),
+    LANaropin = if_else(
+      stringr::str_detect(str_to_lower(LocalInfiltrationComposition),"naropin"),
+      TRUE,
+      FALSE
+    ),
+    LATXA = if_else(
+      stringr::str_detect(str_to_lower(LocalInfiltrationComposition),"tranexamic"),
+      TRUE,
+      FALSE
+    ),
+    FemurImplantHipManufacturer2 = case_when(
+      stringr::str_detect(str_to_lower(FemurImplantHipManufacturer),"zimmer") ~ "Zimmer Biomet",
+      stringr::str_detect(str_to_lower(FemurImplantHipManufacturer),"yker|mako") ~ "Stryker"
+    ),
+    AcetabulumHipManufacturer2 = case_when(
+      stringr::str_detect(str_to_lower(AcetabulumHipManufacturer),"zimmer") ~ "Zimmer Biomet",
+      stringr::str_detect(str_to_lower(AcetabulumHipManufacturer),"yker|mako") ~ "Stryker"
+    )
+  )
+```
+
+
+
+```{r}
+#| label: tbl-ha-intraop
+#| tbl-cap: "Summary of intraoperative variables in Hip Arthritis cohort"
+
+TableHAsurg <- gtsummary::tbl_summary(
+  SnapshotHA2 |> dplyr::select(
+    Surgeon,
+    MissIntraOp,
+    DVTProphylaxisProvided:InvolvedJoint,
+    OAGradeHip,
+    ArthroplastyTreatmentHip:BearingTypeHip
+  ),
+  by = "Surgeon",
+  missing = "no"
+  # type = list(
+  #     c(
+  #       ArthroplastyTreatmentKnee,
+  #     AnalgesiaProvided,
+  #     AbxProphylaxisProvided,
+  #     AnalgesiaStandardProtocol,
+  #     ArthroplastyProcedureMedialTibiofemoral) ~ "dichotomous"
+  # ),
+  # value = list(
+  #   c(
+  #     ArthroplastyTreatmentKnee,
+  #     AnalgesiaProvided,
+  #     AbxProphylaxisProvided,
+  #     AnalgesiaStandardProtocol) ~ "Yes",
+  #   ArthroplastyProcedureMedialTibiofemoral ~ "Prosthesis Insertion"
+  # ),
+
+)
+
+knitr::knit_print(TableHAsurg)
+
+
+```
+
+```{r}
+#| label: tbl-ha-prae
+#| tbl-cap: "Summary of patient-reported adverse events in Hip Arthritis cohort"
+
+TableHAPRAE <- gtsummary::tbl_summary(
+  SnapshotHA |> dplyr::select(
+    PRAEventsQ1_6weeks:PRAEventsFlag_6weeks,
+    -PRAEventsQ6_6weeks,
+    -PRAEventsQ8_6weeks
+  ),
+  missing = "no",
+  label = list(
+    PRAEventsQ1_6weeks = "Subsequent Surgery",
+    PRAEventsQ2_6weeks = "ED Visit",
+    PRAEventsQ3_6weeks = "Non-Surgeon Healthcare",
+    PRAEventsQ4_6weeks = "Unplanned Surgeon Followup",
+    PRAEventsQ5_6weeks = "Change in Overall Health",
+    PRAEventsQ7_6weeks = "Nature of Visit",
+    PRAEventsQ9Pain_6weeks = "Pain",
+    PRAEventsQ9Stiffness_6weeks = "Stiffness",
+    PRAEventsQ9Instability_6weeks = "Instability",              
+    PRAEventsQ9LossOfLength_6weeks = "Loss of Alignment | Shape",
+    PRAEventsQ9LossOfFeeling_6weeks = "Loss of Feeling",
+    PRAEventsQ9Weakness_6weeks = "Loss of Control | Weakness",
+    PRAEventsQ9Irritation_6weeks = "Hardware Irritation",
+    PRAEventsQ10_6weeks = "Wound issues",
+    PRAEventsFlag_6weeks = "Event Flag" 
+    # if any Q1-Q4 says Yes, 
+    # Q9 pain/stiffness >= 50 OR 
+    # Q9 length >= 20 OR Q9 feeling/weakness/irritation >= 10
+    # Q10 has redness/heat/swelling/separation/discharge/bleeding or other
+    
+    ),
+)
+
+knitr::knit_print(TableHAPRAE)
+```
+
+
+```{r}
+#| label: fig-hoos12-ha
+#| fig-cap: "Summary of HOOS12 by Timepoint"
+
+preop_position <- which(levels(PROMHA$TimePoint) == "Preop")
+
+
+FigureHOOS12 <- PROMHA |> ggplot(aes(y = HOOS12Score, x = TimePoint)) +
   stat_halfeye(
     alpha = 0.5,  # Transparency for overlap visibility
     position = "identity",  # Overlay the distributions
@@ -1025,10 +1396,8 @@ FigureWORC_overlay <- PROMKA2 |> dplyr::filter(
   scale_fill_manual(values = c("Surgical" = "steelblue", "Non-Surgical" = "darkgray", "Surgery recommended" = "darkred")) +
   scale_color_manual(values = c("Surgical" = "steelblue4", "Non-Surgical" = "dimgray", "Surgery recommended" = "darkred")) +
   labs(
-    y = "WORC Normalised",
-    x = "Time Point",
-    fill = "Treatment",
-    color = "Treatment"
+    y = "HOOS12 Total Score",
+    x = "Time Point"
   ) +
   theme_minimal() +
   theme(
@@ -1036,171 +1405,10 @@ FigureWORC_overlay <- PROMKA2 |> dplyr::filter(
     panel.grid.minor = element_blank()
   )
 
-knitr::knit_print(FigureWORC_overlay)
+knitr::knit_print(FigureHOOS12)
 ```
 
-```{r}
-#| label: fig-worcq3-rc
-#| fig-cap: "Summary of WORC Physical Q3 (weakness) by Timepoint"
 
-FigureWORCQ3_overlay <- PROMRC |> dplyr::filter(
-  !(is.na(SurgicalTreatment2))
-) |> ggplot(aes(y = WORCPhysicalQ3, x = TimePoint, fill = SurgicalTreatment2, color = SurgicalTreatment2)) +
-  stat_halfeye(
-    alpha = 0.5,  # Transparency for overlap visibility
-    position = "identity",  # Overlay the distributions
-    na.rm = TRUE,
-    scale = 0.9  # Slightly scale down to avoid too much overlap
-  ) +
-  # Add the ellipse annotation
-  # ggforce::geom_ellipse(aes(x0 = preop_position, 
-  #                 y0 = 70, 
-  #                 a = 0.3, 
-  #                 b = 5, 
-  #                 angle = 0),
-  #            color = "red", 
-  #            size = 1.2,
-  #            inherit.aes = FALSE) +
-  # annotate("text", 
-  #          x = preop_position + 0.4, 
-  #          y = 85,
-  #          label = "High preop scores",
-  #          color = "red",
-  #          fontface = "bold",
-  #          size = 3.5) +
-  # Add appropriate scale colors
-  scale_fill_manual(values = c("Surgical" = "steelblue", "Non-Surgical" = "darkgray", "Surgery recommended" = "darkred")) +
-  scale_color_manual(values = c("Surgical" = "steelblue4", "Non-Surgical" = "dimgray", "Surgery recommended" = "darkred")) +
-  labs(
-    y = "WORC Normalised",
-    x = "Time Point",
-    fill = "Treatment",
-    color = "Treatment"
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = "top",
-    panel.grid.minor = element_blank()
-  )
-
-knitr::knit_print(FigureWORCQ3_overlay)
-```
-
-Assessment of the *Knee Arthritis* cohort reveals that some patients enrolled in the cohort are scoring high on the KOOS JR preoperatively, intraoperative data requires backfilling and that there may be sufficient variation in surgical technique to warrant further investigation (e.g. patellar resurfacing, tourniquet use, soft tissue management).
-
-## Hip Arthritis
-
-```{r}
-#| label: tbl-ghi-demographics
-#| tbl-cap: "Summary of demographics in Hip Arthritis cohort"
-
-TableHAdemo <- gtsummary::tbl_summary(
-  Snapshot |> dplyr::filter(
-    str_detect(RegistryCohortName, "HipArthritis")
-  ) |> dplyr::select(
-    TreatmentType,
-    SurgicalTreatment,
-    TreatmentStatus,
-    DateInitialExamination,
-    AgeAtInitialExam,
-    Sex,
-    ComorbScore_Preop
-  ),
-  by = "SurgicalTreatment",
-  missing = "no",
-  statistic = list(
-    DateInitialExamination ~ "{min} - {max}"
-  )
-)
-
-knitr::knit_print(TableHAdemo)
-```
-
-```{r}
-#| label: tbl-ghi-intraop
-#| tbl-cap: "Summary of intraoperative variables in Rotator Cuff cohort"
-#| eval: FALSE
-
-TableGHIsurg <- gtsummary::tbl_summary(
-  Snapshot |> dplyr::filter(
-    RegistryCohortName == "RotatorCuff",
-    SurgicalTreatment2 == "Surgical"
-  ) |> dplyr::select(
-    LabralTear:RepairAugmentation
-  ) |> mutate(
-    across(contains("TearSize"), ~as.numeric(.))
-  ),
-  missing = "no"
-)
-
-knitr::knit_print(TableGHIsurg)
-
-
-```
-
-```{r}
-
-GHIIntraop <- Snapshot |> filter(
-  RegistryCohortName == "GlenohumeralInstability",
-  SurgicalTreatment2 == "Surgical"
-)  |> dplyr::select(
-    LabralTear:RepairAugmentation
-)
-
-```
-
-```{r}
-#| label: fig-wosi-ghi
-#| fig-cap: "Summary of WOSI normalised by Timepoint for primary presentations of Glenohumeral Instability"
-
-preop_position <- which(levels(PROMGHI$TimePoint) == "Preop")
-
-FigureWOSI <- PROMGHI |> dplyr::filter(
-  !(is.na(SurgicalTreatment2)),
-  TreatmentType == "Primary"
-) |> ggplot(aes(y = WOSINorm, x = TimePoint, fill = SurgicalTreatment2, color = SurgicalTreatment2)) +
-  stat_halfeye(
-    alpha = 0.5,  # Transparency for overlap visibility
-    position = "identity",  # Overlay the distributions
-    na.rm = TRUE,
-    scale = 0.9  # Slightly scale down to avoid too much overlap
-  ) +
-  # Add the ellipse annotation
-  ggforce::geom_ellipse(
-    data = data.frame(x0 = preop_position, y0 = 70, a = 0.3, b = 5, angle = 0),
-    aes(x0 = x0, y0 = y0, a = a, b = b, angle = angle),
-    color = "red", 
-    size = 1.2,
-    inherit.aes = FALSE
-  ) +
-  annotate("text", 
-           x = preop_position + 0.4, 
-           y = 85,
-           label = "High preop scores",
-           color = "red",
-           fontface = "bold",
-           size = 3.5) +
-  # Add appropriate scale colors
-  scale_fill_manual(values = c("Surgical" = "steelblue", "Non-Surgical" = "darkgray", "Surgery recommended" = "darkred")) +
-  scale_color_manual(values = c("Surgical" = "steelblue4", "Non-Surgical" = "dimgray", "Surgery recommended" = "darkred")) +
-  labs(
-    y = "WOSI Normalised Score",
-    x = "Time Point",
-    fill = "Treatment",
-    color = "Treatment"
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = "top",
-    panel.grid.minor = element_blank()
-  )
-
-
-knitr::knit_print(FigureWOSI)
-
-```
-
-Overall, the *Glenohumeral Instability* cohort mean WOSI score does not reach the reported patient acceptable symptom state (\~ 80) on average at up to 2 years followup. Considering the missingness patterns in the data, this could be attributed to patients self-selecting into responding to PROMs.
 
 # Interpretation
 
