@@ -275,6 +275,7 @@ Flowcharts as per STROBE [@Vandenbroucke2007] and RECORD [@Benchimol2015] guidel
 
 ```{r}
 
+CurrentDate <- as.character("20250611")
 
 STROBEFlow2 <- STROBEInput |> 
   # Filter out rows with missing TreatmentID
@@ -289,7 +290,7 @@ STROBEFlow2 <- STROBEInput |>
         EligibleAtPreop,
         EligibleAtx6months,
         SurgicalTreatment
-      ) |> 
+      ) |>
       # Convert all date columns to date format
       dplyr::mutate(
         across(contains("Date"), lubridate::ymd)
@@ -301,14 +302,19 @@ STROBEFlow2 <- STROBEInput |>
           TreatmentStatus == "No further followup" & is.na(DateTreatment),
           "Archived",
           TreatmentStatus
-  )
+  ),
+        EligibleAtx6months1 = if_else(
+          as.numeric(as.duration(interval(ymd(DateTreatment), ymd(CurrentDate))),"days") >= 154,
+          "Yes",
+          NA_character_
+        )
   )
 
 ```
 
 ```{r}
 
-CurrentDate <- as.character("20250611")
+
 
 STROBEFlow3 <- STROBEFlow2 |> dplyr::mutate(
     exclusion1 = case_when(
@@ -326,7 +332,7 @@ STROBEFlow3 <- STROBEFlow2 |> dplyr::mutate(
   lost_followup = case_when(
     is.na(exclusion1) & TreatmentStatus2 == "Failed" & (ymd(DateStatusChange) < ymd(CurrentDate)) ~ "Procedure failure",
     is.na(exclusion1) & TreatmentStatus2 == "No further followup" & (ymd(DateStatusChange) < ymd(CurrentDate)) ~ "Patient Opt-out",
-    is.na(exclusion1) & is.na(EligibleAtx6months) ~ "Not eligible for followup"
+    is.na(exclusion1) & is.na(EligibleAtx6months1) ~ "Not eligible for followup"
   ),
   mitt = if_else(
     !is.na(followup) & is.na(lost_followup),
@@ -383,7 +389,7 @@ Cumulative recruitment over time was plotted from Registry inception to the pres
 
 ```{r}
 #| label: fig-progress
-#| fig-cap: "Cumulative record creation within OC from inception to present"
+#| fig-cap: "Cumulative record creation for surgical cases within OC from inception to present"
 
 
 RecordCount <- dplyr::summarise(
@@ -466,8 +472,12 @@ max_percent <- 100  # Or another value that encompasses all your data
 ```{r}
 #| label: fig-LEFS-miss
 #| fig-cap: "Missingness of LEFS by Timepoint across all cohorts"
+#| evaluate: false
 
-PROMLEFS <- Snapshot |> dplyr::select(
+PROMLEFS <- Snapshot |> dplyr::filter(
+  (str_detect(RegistryCohortName, "General|LowerLimb|")),
+  (str_detect(RegistryCohortName, "General|LowerLimb|Knee.*Surgical"))
+  ) |> dplyr::select(
   TreatmentID,
   starts_with("LEFS"),
   starts_with("EligibleAt"),
